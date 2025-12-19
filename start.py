@@ -10,28 +10,28 @@ from pathlib import Path
 
 def check_dependencies():
     """Check if required dependencies are installed"""
-    print("🔍 Checking dependencies...")
+    print("[CHECK] Checking dependencies...")
     
     # Check Python packages
     try:
         import fastapi
         import uvicorn
-        print("✅ Backend dependencies found")
+        print("[OK] Backend dependencies found")
     except ImportError:
-        print("❌ Backend dependencies missing. Installing...")
+        print("[INSTALL] Backend dependencies missing. Installing...")
         subprocess.run([sys.executable, "-m", "pip", "install", "-r", "requirements-api.txt"])
     
     # Check if frontend/node_modules exists
     frontend_dir = Path("frontend")
     if not (frontend_dir / "node_modules").exists():
-        print("❌ Frontend dependencies missing. Installing...")
+        print("[INSTALL] Frontend dependencies missing. Installing...")
         subprocess.run(["npm", "install"], cwd=frontend_dir, shell=True)
     else:
-        print("✅ Frontend dependencies found")
+        print("[OK] Frontend dependencies found")
 
 def start_backend():
     """Start FastAPI backend server"""
-    print("\n🚀 Starting backend API on http://localhost:8000...")
+    print("\n[START] Starting backend API on http://localhost:8000...")
     return subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "api:app", "--reload", "--port", "8000"],
         stdout=subprocess.PIPE,
@@ -40,7 +40,7 @@ def start_backend():
 
 def start_frontend():
     """Start Next.js frontend dev server"""
-    print("🚀 Starting frontend on http://localhost:3000...")
+    print("[START] Starting frontend on http://localhost:3000...")
     return subprocess.Popen(
         ["npm", "run", "dev"],
         cwd="frontend",
@@ -52,10 +52,10 @@ def start_frontend():
 def main():
     """Main launcher"""
     print("""
-╔══════════════════════════════════════╗
-║        🔍 TruthLens Launcher        ║
-║   AI Hallucination Detection Tool   ║
-╚══════════════════════════════════════╝
+==================================================
+        TruthLens Launcher
+   AI Hallucination Detection Tool
+==================================================
     """)
     
     # Check dependencies
@@ -73,11 +73,11 @@ def main():
     frontend_process = start_frontend()
     
     print("\n" + "="*50)
-    print("✅ TruthLens is running!")
+    print("[SUCCESS] TruthLens is running!")
     print("="*50)
-    print("\n📍 Backend API:  http://localhost:8000")
-    print("📍 Frontend App: http://localhost:3000")
-    print("📍 API Docs:     http://localhost:8000/docs")
+    print("\n[INFO] Backend API:  http://localhost:8000")
+    print("[INFO] Frontend App: http://localhost:3000")
+    print("[INFO] API Docs:     http://localhost:8000/docs")
     print("\nPress Ctrl+C to stop both servers\n")
     
     try:
@@ -85,10 +85,10 @@ def main():
         backend_process.wait()
         frontend_process.wait()
     except KeyboardInterrupt:
-        print("\n\n🛑 Stopping TruthLens...")
+        print("\n\n[STOP] Stopping TruthLens...")
         backend_process.terminate()
         frontend_process.terminate()
-        print("✅ Shutdown complete")
+        print("[SUCCESS] Shutdown complete")
 
 if __name__ == "__main__":
     main()

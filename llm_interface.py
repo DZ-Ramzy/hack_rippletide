@@ -12,6 +12,7 @@ class LLMInterface:
     
     def __init__(self):
         self.provider = Config.LLM_PROVIDER
+        self._last_citations = []  # Store Perplexity citations
         
         if self.provider == 'openai':
             self.client = OpenAI(api_key=Config.OPENAI_API_KEY)
@@ -44,17 +45,40 @@ class LLMInterface:
             system_prompt = self._get_default_answer_prompt()
         
         try:
-            response = self.client.chat.completions.create(
-                model=Config.MAIN_MODEL,
-                messages=[
+            print(f"Calling LLM to generate answer...")
+            
+            # Prepare common parameters
+            params = {
+                "model": Config.MAIN_MODEL,
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": question}
                 ],
-                temperature=0.7,
-                max_tokens=1000
-            )
-            return response.choices[0].message.content.strip()
+                "temperature": 0.1,  # Low temperature for consistent, deterministic answers
+                "max_tokens": 500,  # Reduced from 1000 for faster response
+            }
+            
+            # Add Perplexity-specific parameters only for Perplexity provider
+            # Note: These parameters are only supported by Perplexity API
+            # if self.provider == 'perplexity':
+            #     params["return_citations"] = True
+            #     params["return_related_questions"] = False
+            
+            response = self.client.chat.completions.create(**params)
+            print(f"LLM response received")
+            
+            # Store citations if Perplexity provides them
+            answer_text = response.choices[0].message.content.strip()
+            if self.provider == 'perplexity' and hasattr(response, 'citations'):
+                self._last_citations = response.citations
+                print(f"Received {len(response.citations)} citations from Perplexity")
+            else:
+                self._last_citations = []
+            
+            return answer_text
         except Exception as e:
+            print(f"LLM error: {str(e)}")
+            self._last_citations = []
             raise Exception(f"Error generating answer: {str(e)}")
     
     def verify_claims(self, answer: str, search_results: list, question: str) -> Dict[str, Any]:
@@ -87,6 +111,7 @@ Analyze the answer and return your verification results as valid JSON.
 """
         
         try:
+            print(f"Calling LLM to verify claims...")
             # Perplexity doesn't support response_format parameter
             if self.provider == 'perplexity':
                 response = self.client.chat.completions.create(
@@ -95,8 +120,8 @@ Analyze the answer and return your verification results as valid JSON.
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
                     ],
-                    temperature=0.2,
-                    max_tokens=2000
+                    temperature=0,  # Zero temperature for deterministic verification
+                    max_tokens=1500  # Reduced from 2000 for faster response
                 )
             else:
                 response = self.client.chat.completions.create(
@@ -105,10 +130,11 @@ Analyze the answer and return your verification results as valid JSON.
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
                     ],
-                    temperature=0.2,
-                    max_tokens=2000,
+                    temperature=0,  # Zero temperature for deterministic verification
+                    max_tokens=1500,  # Reduced from 2000 for faster response
                     response_format={"type": "json_object"}
                 )
+            print(f"Verification response received")
             
             result_text = response.choices[0].message.content.strip()
             return json.loads(result_text)
@@ -205,4 +231,19 @@ Calculate overall_confidence as:
                 }
             ]
         }
+    
+    def get_last_citations(self) -> list:
+        """Get citations from the last Perplexity answer"""
+        return self._last_citations
+    
+    def convert_citations_to_sources(self) -> list:
+        """Convert Perplexity citations to source format"""
+        sources = []
+        for i, url in enumerate(self._last_citations, 1):
+            sources.append({
+                'title': f'Source {i}',
+                'snippet': '',
+                'url': url
+            })
+        return sources
 

@@ -107,20 +107,11 @@ class SearchModule:
         Returns:
             List of search queries
         """
-        # For hackathon simplicity, create 2-3 focused queries
+        # Optimized for speed: single focused query with recency
         queries = []
         
-        # Query 1: Original question
-        queries.append(question)
-        
-        # Query 2: Question + year for recency
+        # Single query: Question + year for recency (best balance of speed and relevance)
         queries.append(f"{question} 2024 2025")
         
-        # Query 3: Extract key terms (simple approach)
-        # In production, we'd use NLP, but for hackathon this works
-        key_terms = question.replace('?', '').replace('how to', '').replace('what is', '').replace('best practices', 'guide')
-        if len(key_terms) > 10:
-            queries.append(key_terms.strip())
-        
-        return queries[:2]  # Keep it to 2 queries for speed
+        return queries  # Keep it to 1 query for optimal speed
 

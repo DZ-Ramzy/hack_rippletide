@@ -4,6 +4,12 @@ import { motion } from 'framer-motion';
 import { CheckCircle, AlertTriangle, Clock, HelpCircle, XCircle, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 
+interface Source {
+  title: string;
+  snippet: string;
+  url: string;
+}
+
 interface Claim {
   text: string;
   status: 'verified' | 'uncertain' | 'outdated' | 'unsupported' | 'contradicted';
@@ -14,10 +20,29 @@ interface Claim {
 interface ClaimCardProps {
   claim: Claim;
   index: number;
+  allSources?: Source[];
 }
 
-export default function ClaimCard({ claim, index }: ClaimCardProps) {
+export default function ClaimCard({ claim, index, allSources = [] }: ClaimCardProps) {
   const [expanded, setExpanded] = useState(false);
+  
+  // Helper function to find matching source from claim source reference
+  const findSourceByReference = (sourceRef: string): Source | null => {
+    // Try to parse [1], [2], etc. format
+    const bracketMatch = sourceRef.match(/\[(\d+)\]/);
+    if (bracketMatch) {
+      const sourceIndex = parseInt(bracketMatch[1], 10) - 1; // Convert to 0-based index
+      if (sourceIndex >= 0 && sourceIndex < allSources.length) {
+        return allSources[sourceIndex];
+      } else {
+        console.log(`Source index ${sourceIndex} out of bounds. Available sources:`, allSources.length);
+      }
+    }
+    
+    // Fallback: try to match by URL or title directly
+    const matchedSource = allSources.find(s => s.url === sourceRef || s.title === sourceRef);
+    return matchedSource || null;
+  };
 
   const getStatusConfig = () => {
     switch (claim.status) {
@@ -197,18 +222,45 @@ export default function ClaimCard({ claim, index }: ClaimCardProps) {
                 className="overflow-hidden"
               >
                 <div className="mt-4 space-y-2 pl-4 border-l-2 border-purple-500/40">
-                  {claim.sources.map((source, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="flex items-start gap-2 text-gray-400 text-sm hover:text-gray-300 transition-colors"
-                    >
-                      <span className="text-purple-400 font-bold mt-0.5">•</span>
-                      <span>{source}</span>
-                    </motion.div>
-                  ))}
+                  {claim.sources.map((sourceRef, i) => {
+                    const matchedSource = findSourceByReference(sourceRef);
+                    
+                    if (matchedSource) {
+                      // Display as clickable link with source details
+                      return (
+                        <motion.a
+                          key={i}
+                          href={matchedSource.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.05 }}
+                          className="flex items-start gap-2 text-gray-400 text-sm hover:text-purple-400 transition-colors group cursor-pointer"
+                        >
+                          <span className="text-purple-400 font-bold mt-0.5">•</span>
+                          <div className="flex-1">
+                            <div className="font-semibold group-hover:underline">{matchedSource.title}</div>
+                            <div className="text-xs text-gray-500 truncate">{matchedSource.url}</div>
+                          </div>
+                        </motion.a>
+                      );
+                    } else {
+                      // Display as plain text if no match found
+                      return (
+                        <motion.div
+                          key={i}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.05 }}
+                          className="flex items-start gap-2 text-gray-400 text-sm"
+                        >
+                          <span className="text-purple-400 font-bold mt-0.5">•</span>
+                          <span>{sourceRef}</span>
+                        </motion.div>
+                      );
+                    }
+                  })}
                 </div>
               </motion.div>
             </motion.div>

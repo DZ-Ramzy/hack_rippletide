@@ -35,7 +35,7 @@ class Config:
         VERIFIER_MODEL = 'grok-beta'
     
     # Verification settings
-    MAX_SEARCH_RESULTS = 5
+    MAX_SEARCH_RESULTS = 3  # Reduced from 5 for faster response
     CONFIDENCE_THRESHOLD_HIGH = 80
     CONFIDENCE_THRESHOLD_LOW = 50
     

@@ -3,6 +3,7 @@ Verification Engine
 Coordinates the verification process
 """
 from typing import Dict, Any, List
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from llm_interface import LLMInterface
 from search_module import SearchModule
 
@@ -24,23 +25,45 @@ class VerificationEngine:
             Dictionary containing answer, verification results, and sources
         """
         # Step 1: Generate answer
+        print("Generating AI answer...")
         answer = self.llm.generate_answer(question)
+        print(f"Answer generated: {len(answer)} characters")
         
-        # Step 2: Search for sources
+        # Step 2: Search for sources (parallelized for speed)
+        print("Searching web sources...")
         search_queries = self.search.generate_search_queries(question, answer)
+        print(f"Generated {len(search_queries)} search queries")
         all_sources = []
         
-        for query in search_queries:
-            results = self.search.search(query)
-            all_sources.extend(results)
+        # Execute searches in parallel for faster results
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            future_to_query = {executor.submit(self.search.search, query): query for query in search_queries}
+            for future in as_completed(future_to_query):
+                try:
+                    results = future.result(timeout=15)  # 15 second timeout per search
+                    all_sources.extend(results)
+                    print(f"Search completed: {len(results)} results")
+                except Exception as e:
+                    print(f"WARNING: Search failed: {str(e)}")
+        
+        # If no sources from search, try to use Perplexity citations
+        if len(all_sources) == 0:
+            perplexity_sources = self.llm.convert_citations_to_sources()
+            if perplexity_sources:
+                all_sources.extend(perplexity_sources)
+                print(f"Using {len(perplexity_sources)} citations from Perplexity")
         
         # Deduplicate sources by URL
         unique_sources = self._deduplicate_sources(all_sources)
+        print(f"Found {len(unique_sources)} unique sources")
         
         # Step 3: Verify claims
+        print("Verifying claims against sources...")
         verification = self.llm.verify_claims(answer, unique_sources, question)
+        print(f"Verification complete: {len(verification.get('claims', []))} claims analyzed")
         
         # Step 4: Compile results
+        print("Compiling final results...")
         return {
             'question': question,
             'answer': answer,
@@ -60,13 +83,26 @@ class VerificationEngine:
         Returns:
             Dictionary containing verification results and sources
         """
-        # Search for sources
+        # Search for sources (parallelized for speed)
         search_queries = self.search.generate_search_queries(question, answer)
         all_sources = []
         
-        for query in search_queries:
-            results = self.search.search(query)
-            all_sources.extend(results)
+        # Execute searches in parallel for faster results
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            future_to_query = {executor.submit(self.search.search, query): query for query in search_queries}
+            for future in as_completed(future_to_query):
+                try:
+                    results = future.result(timeout=15)  # 15 second timeout per search
+                    all_sources.extend(results)
+                except Exception as e:
+                    print(f"Search failed: {str(e)}")
+        
+        # If no sources from search, try to use Perplexity citations
+        if len(all_sources) == 0:
+            perplexity_sources = self.llm.convert_citations_to_sources()
+            if perplexity_sources:
+                all_sources.extend(perplexity_sources)
+                print(f"Using {len(perplexity_sources)} citations from Perplexity")
         
         # Deduplicate sources
         unique_sources = self._deduplicate_sources(all_sources)
